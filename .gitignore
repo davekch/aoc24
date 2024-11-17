@@ -1,0 +1,12 @@
+AOC_SESSION
+*/input.txt
+
+# haskell build files
+*.dyn_hi
+*.dyn_o
+*.hi
+*.o
+*/solver
+
+# python
+*/__pycache__

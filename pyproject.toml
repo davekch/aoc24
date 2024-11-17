@@ -1,0 +1,12 @@
+[project]
+name = "aoc24"
+version = "0.1.0"
+description = "advent of code solutions 2024"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aoc",
+]
+
+[tool.uv.sources]
+aoc = { path = "aoc/utils/py", editable = true }
