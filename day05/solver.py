@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from dataclasses import dataclass
+from collections import defaultdict
 from pathlib import Path
 from aoc import utils
 
@@ -10,26 +10,31 @@ watch = utils.stopwatch()
 @watch.measure_time
 def parse(raw_data):
     upper, lower = raw_data.split("\n\n")
-    rules = list(map(utils.ints, upper.splitlines()))
     updates = list(map(utils.ints, lower.splitlines()))
+    rules = defaultdict(list)
+    for line in upper.splitlines():
+        first, second = utils.ints(line)
+        rules[first].append(second)
+
     # sort into correct and uncorrect updates so that we don't have to check the correct updates twice
     sorted_updates = {
         "correct": [],
         "incorrect": []
     }
     for update in updates:
-        if all([check(update, r) for r in rules]):
+        if check(update, rules):
             sorted_updates["correct"].append(update)
         else:
             sorted_updates["incorrect"].append(update)        
     return rules, sorted_updates
 
 
-def check(update: list, rule):
-    first, second = rule
-    if not (first in update and second in update):
-        return True
-    return update.index(first) < update.index(second)
+def check(update, rules):
+    for i, page in enumerate(update):
+        for later in rules[page]:
+            if later in update and update.index(later) < i:
+                return False
+    return True
 
 
 @watch.measure_time
@@ -43,14 +48,15 @@ def solve1(data):
 
 def sort_by_rule(update: list, rules: list):
     sorted_update = update[:]
-    while not all([check(sorted_update, r) for r in rules]):
+    while not check(sorted_update, rules):
         # for each rule that is not yet satisfied, swap the offenders
-        for first, second in rules:
-            if first in sorted_update and second in sorted_update:
-                first_index = sorted_update.index(first)
-                second_index = sorted_update.index(second)
-                if first_index > second_index:
-                    sorted_update[first_index], sorted_update[second_index] = sorted_update[second_index], sorted_update[first_index]
+        for first in update:
+            for second in rules[first]:
+                if second in sorted_update:
+                    first_index = sorted_update.index(first)
+                    second_index = sorted_update.index(second)
+                    if first_index > second_index:
+                        sorted_update[first_index], sorted_update[second_index] = sorted_update[second_index], sorted_update[first_index]
     return sorted_update
 
 
