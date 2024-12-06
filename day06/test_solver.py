@@ -33,3 +33,4 @@ def test_solve1(parsed_data):
 def test_solve2(parsed_data):
     solution = solve2(parsed_data)
     assert solution == 6
+    assert False
