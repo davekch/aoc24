@@ -19,24 +19,25 @@ def parse(raw_data):
 
 
 DIRECTIONS = [Direction.N, Direction.E, Direction.S, Direction.W]
+path = set()
 
 
 @watch.measure_time
 def solve1(data):
+    global path
     pos, grid = data
     minx, maxx, miny, maxy = utils.corners(grid)
     facing = Direction.N
-    seen = set()
     while minx <= pos.x <= maxx and miny <= pos.y <= maxy:
         while grid.get(pos+facing, ".") != "#":
-            seen.add(pos)
+            path.add(pos)
             pos += facing
             if not (minx <= pos.x <= maxx and miny <= pos.y <= maxy):
                 break
             # print(utils.dictgrid_to_str(grid | {s: "X" for s in seen} | {pos: "O"}, keybuilder=Vec))
             # time.sleep(0.01)
         facing = DIRECTIONS[(DIRECTIONS.index(facing) + 1) % 4]
-    return len(seen)
+    return len(path)
 
 
 def check_loop(grid, pos, facing):
@@ -65,20 +66,20 @@ def check_loop(grid, pos, facing):
 
 @watch.measure_time
 def solve2(data):
+    global path
     pos, grid = data
     minx, maxx, miny, maxy = utils.corners(grid)
     # make grid sparse
     grid = {k: v for k, v in grid.items() if v != "."}
     obstacles = set()
-    for x in range(minx, maxx+1):
-        for y in range(miny, maxy+1):
-            if Vec(x, y) == pos or Vec(x, y) in grid:
-                continue
-            # put an obstacle at x, y
-            ogrid = grid | {Vec(x, y): "#"}
-            if check_loop(ogrid, pos, Direction.N):
-                obstacles.add(Vec(x, y))
-    print(utils.dictgrid_to_str(grid | {o: "O" for o in obstacles}, empty=".", keybuilder=Vec))
+    for x, y in path:
+        if Vec(x, y) == pos or Vec(x, y) in grid:
+            continue
+        # put an obstacle at x, y
+        ogrid = grid | {Vec(x, y): "#"}
+        if check_loop(ogrid, pos, Direction.N):
+            obstacles.add(Vec(x, y))
+    # print(utils.dictgrid_to_str(grid | {o: "O" for o in obstacles}, empty=".", keybuilder=Vec))
     return len(obstacles)
 
 
