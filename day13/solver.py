@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from pathlib import Path
-import numpy as np
+from fractions import Fraction
 from aoc import utils
 
 
@@ -20,50 +20,38 @@ def parse(raw_data):
     return machines
 
 
-def almost_integer(x, eps=10e-15):
-    return abs(x - round(x)) < abs(eps)
+def solve(xa, ya, xb, yb, xp, yp):
+    b = Fraction(yp - Fraction(xp * ya, xa), yb - Fraction(xb * ya, xa))
+    if b.denominator != 1:
+        return None, None
+    a = Fraction(xp - b * xb, xa)
+    if a.denominator != 1:
+        return None, None
+    return a.numerator, b.numerator
 
 
 @watch.measure_time
 def solve1(data):
     tokens = 0
     for (xa, ya), (xb, yb), (xp, yp) in data:
-        # a, b = np.linalg.solve([[xa, xb], [ya, yb]], [xp, yp])
-        # # print(a, b)
-        # if not almost_integer(a) or not almost_integer(b): # or a > 100 or b > 100:
-        #     continue
-        # a, b = round(a), round(b)
-        # if np.linalg.det([[xa, xb], [ya, yb]]) < 10e-15:
-        #     mini = 10000000000000
-        #     for z in range(-min(a, b), 101-max(a, b)):
-        #         if (a + z) * 3 + b + z < mini:
-        #             a = a + z
-        #             b = b + z
-        #             mini = a * 3 + b
-
-        # assert a * xa + b * xb == xp
-        # assert a * ya + b * yb == yp
-        # tokens += a * 3 + b
-
-        # just brute force
-        mini = 10000000000000000000
-        a = b = 0
-        for aa in range(101):
-            for bb in range(101):
-                if aa * xa + bb * xb == xp and aa * ya + bb * yb == yp:
-                    # print("ye")
-                    if aa * 3 + bb < mini:
-                        a = aa
-                        b = bb
-                        mini = a * 3 + b
+        a, b = solve(xa, ya, xb, yb, xp, yp)
+        if a is None:
+            continue
         tokens += a * 3 + b
-
-    return int(tokens)
+    return tokens
 
 
 @watch.measure_time
 def solve2(data):
-    pass
+    tokens = 0
+    offset = 10000000000000
+    for (xa, ya), (xb, yb), (xp, yp) in data:
+        a, b = solve(xa, ya, xb, yb, xp + offset, yp + offset)
+        if a is None:
+            continue
+        tokens += a * 3 + b
+    return tokens
+    
 
 
 if __name__ == "__main__":
