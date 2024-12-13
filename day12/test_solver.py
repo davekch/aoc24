@@ -32,4 +32,4 @@ def test_solve1(parsed_data):
 # PART 2
 def test_solve2(parsed_data):
     solution = solve2(parsed_data)
-    assert solution == 1260
+    assert solution == 1206

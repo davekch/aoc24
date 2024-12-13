@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from queue import Queue
+from itertools import combinations
 from aoc import utils
 from aoc.geometry import Vec, neighbours4, Direction
 from aoc.data import GraphABC
@@ -24,9 +25,9 @@ def parse(raw_data):
     regions = []
     for point in graph.graph:
         if point not in seen:
-            region, border, area, perimeter = flood_fill(graph, point)
+            region, area, perimeter = flood_fill(graph, point)
             seen |= region
-            regions.append(((grid[point], region), border, area, perimeter))
+            regions.append(((grid[point], region), area, perimeter))
     return regions
 
 
@@ -34,7 +35,6 @@ def parse(raw_data):
 def flood_fill(graph: Graph, start: Vec):
     """returns points in region, border, area, permimeter"""
     region = set()
-    border = set()
     perimeter = 0
     queue = Queue()
     queue.put(start)
@@ -45,50 +45,58 @@ def flood_fill(graph: Graph, start: Vec):
         region.add(current)
         ns = graph.neighbours(current)
         perimeter += 4 - len(ns)
-        if 4 - len(ns) > 0:
-            border.add(current)
         # print(current, 4- len(ns))
         for n in ns:
             if n not in region:
                 queue.put(n)
-    return region, border, len(region), perimeter
+    return region, len(region), perimeter
 
 
 @watch.measure_time
 def solve1(data):
     price = 0
-    for _, _, area, perimeter in data:
+    for _, area, perimeter in data:
         price += area * perimeter
     return price
 
 
-def count_sides(region, border):
-    # region = Graph(region)
-    # note that a border can be inside the region
-    invariant_dir = {
-        Direction.N: ("N", 0),  # if the border is facing north, the x-direction is invariant
-        Direction.E: ("E", 1),  # if the border is facing east, the y-direction is invariant
-        Direction.S: ("S", 0),
-        Direction.W: ("W", 1),
-    }
-    sides = set()   # (facing, invariant coordinate)
-    for point in border:
-        for dir in invariant_dir:
-            if point + dir not in region:
-                sides.add((invariant_dir[dir][0], point.coords[invariant_dir[dir][1]]))
-    print(sides)
-    return len(sides)
+def count_corners(region: set, tile: Vec):
+    """calculates how many corners this tile contributes to the shape"""
+    neighbours = [n for n in neighbours4(tile) if n in region]
+    if len(neighbours) == 0:
+        return 4
+    elif len(neighbours) == 1:
+        return 2
+    else:
+        filled_diagonals = 0
+        antiparallel = 0
+        for n1, n2 in combinations(neighbours, 2):
+            if tile - n1 != n2 - tile:
+                # they are perpendicular, check the tile between
+                if tile + (n1 - tile) + (n2 - tile) in region:
+                    filled_diagonals += 1
+            else:
+                antiparallel += 1
 
-def count_corners(region: set, border: set):
-    ...
+        if len(neighbours) == 2:
+            if antiparallel:
+                return 0
+            else:
+                return 2 - filled_diagonals
+        elif len(neighbours) == 3:
+            return 2 - filled_diagonals
+        elif len(neighbours) == 4:
+            return 4 - filled_diagonals
 
 
 @watch.measure_time
 def solve2(data):
     price = 0
-    for (name, region), border, area, _ in data:
-        n_sides = count_sides(region, border)
-        print(f"{name}: {n_sides=}")
+    for (name, region), area, _ in data:
+        n_sides = 0
+        for tile in region:
+            n_sides += count_corners(region, tile)  # number of corners and sides is the same
+        # print(f"{name}: {area=} {n_sides=}")
         price += area * n_sides
     return price
 
