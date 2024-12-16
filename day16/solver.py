@@ -1,17 +1,20 @@
 #!/usr/bin/env python
 
 from pathlib import Path
-import rich
+from queue import PriorityQueue
+from collections import defaultdict
+from functools import cache
 from aoc import utils
-from aoc.geometry import Vec, neighbours4, Direction
+from aoc.geometry import Vec, Direction
 from aoc.data import WeightedGraphABC
-from aoc.algos import dijkstra, shortestpath
+from aoc.algos import dijkstra
 
 
 watch = utils.stopwatch()
 
 
 class WeightedGraph(WeightedGraphABC):
+    @cache
     def neighbours(self, node):
         # nodes are (position, facing)
         ns = []
@@ -58,9 +61,37 @@ def solve1(data):
     return distances[current]
 
 
+def terrible_dijkstra(graph, start, end):
+    queue = PriorityQueue()
+    queue.put((0, start[1], [start[0]]))   # enqueue total_distance, facing, path_so_far
+    distances = defaultdict(lambda: 1e15)
+    distances[start] = 0
+    valid_paths = defaultdict(list)   # maps total distance to list of paths
+    while not queue.empty():
+        current_distance, facing, current_path = queue.get()
+        current_pos = current_path[-1]
+        current = (current_pos, facing)
+        for n in graph.neighbours(current):
+            if n[0] in current_path:
+                continue
+            d = current_distance + graph.distance(current, n)
+            if d > distances[n]:
+                continue
+            distances[n] = d
+            if n[0] == end:
+                valid_paths[d].append(current_path + [n[0]])
+            else:
+                queue.put((d, n[1], current_path + [n[0]]))
+    return valid_paths
+
+
 @watch.measure_time
 def solve2(data):
-    pass
+    graph, start, end = data
+    paths = terrible_dijkstra(graph, start, end)
+    min_dist = min(paths.keys())
+    on_path = set(sum(paths[min_dist], start=[]))
+    return len(on_path)
 
 
 if __name__ == "__main__":
