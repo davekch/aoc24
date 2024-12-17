@@ -3,29 +3,24 @@
 from pathlib import Path
 import math
 from copy import copy
-import numba
 import re
-# from aoc import utils
+from aoc import utils
 
-# watch = utils.stopwatch()
+watch = utils.stopwatch()
 
 
-def ints(s: str) -> list[int]:
-    return list(map(int, re.findall(r"[+-]?\d+", s)))
-
-# @watch.measure_time
+@watch.measure_time
 def parse(raw_data):
     lines = iter(raw_data.splitlines())
     register = {}
-    register["A"] = ints(next(lines))[0]
-    register["B"] = ints(next(lines))[0]
-    register["C"] = ints(next(lines))[0]
+    register["A"] = utils.ints(next(lines))[0]
+    register["B"] = utils.ints(next(lines))[0]
+    register["C"] = utils.ints(next(lines))[0]
     next(lines)
-    program = ints(next(lines))
+    program = utils.ints(next(lines))
     return register, program
 
 
-@numba.njit
 def combo(operand, register):
     if operand <= 3:
         return operand
@@ -67,39 +62,46 @@ def instruction(opcode, operand, register, i, output):
         return i + 2
 
 
-# @watch.measure_time
-def solve1(data):
-    register, program = data
-    # print(register)
-    # print(program)
+def run(register, program):
     i = 0
     output = []
     while i < len(program):
         i = instruction(program[i], program[i+1], register, i, output)
-        # print(i)
+    return output
+
+def run_while_quine(register, program):
+    i = 0
+    quine_i = 0
+    output = []
+    while i < len(program):
+        _i = instruction(program[i], program[i+1], register, i, output)
+        if program[i] == 5:
+            # something was added to the output
+            if output[quine_i] != program[quine_i]:
+                return output
+            else:
+                quine_i += 1
+        i = _i
+    return output
+
+
+@watch.measure_time
+def solve1(data):
+    register, program = data
+    output = run(register, program)
     return ",".join(map(str, output))
 
 
-jitted_instruction = numba.njit(instruction)
-# jitted_combo = numba.njit(combo)
-
-
-# @watch.measure_time
-@numba.njit(parallel=True)
+@watch.measure_time
 def solve2(data):
     register_backup, program = data
-    quine = ",".join(map(str, program))
-    for A in numba.prange(int(1e15)):
-        if A % 100000000:
+    for A in range(int(1e15)):
+        if A % 100000 == 0:
             print(A)
-        register = [v for v in register_backup.values()]
+        register = copy(register_backup)
         register["A"] = A
-        i = 0
-        output = numba.typed.List()
-        while i < len(program):
-            i = jitted_instruction(program[i], program[i+1], register, i, output)
-            # print(i)
-        if quine == ",".join(map(str, output)):
+        output = run_while_quine(register, program)
+        if output == program:
             return A
 
 
@@ -108,5 +110,5 @@ if __name__ == "__main__":
     print(f"Part 1: {solve1(data)}")
     print(f"Part 2: {solve2(data)}")
     print()
-    # watch.print_times()
+    watch.print_times()
 
