@@ -3,7 +3,7 @@
 from pathlib import Path
 import math
 from copy import copy
-import re
+from collections import defaultdict
 from aoc import utils
 
 watch = utils.stopwatch()
@@ -95,14 +95,26 @@ def solve1(data):
 @watch.measure_time
 def solve2(data):
     register_backup, program = data
-    for A in range(int(1e15)):
+    out_sequence = defaultdict(list)
+    offsets = defaultdict(lambda: None)
+    done = [False for _ in range(len(program))]
+    A = 0
+    while any(offsets[i] is None for i in range(len(program))):
         if A % 100000 == 0:
             print(A)
+        if A == 100:
+            break
         register = copy(register_backup)
         register["A"] = A
-        output = run_while_quine(register, program)
-        if output == program:
-            return A
+        output = run(register, program)
+        for i, o in enumerate(output):
+            out_sequence[i].append(o)
+            if i < len(program) and o == program[i] and offsets[i] is None:
+                offsets[i] = A
+        A += 1
+    print(offsets)
+    import rich
+    rich.print(out_sequence)
 
 
 if __name__ == "__main__":
