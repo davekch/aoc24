@@ -54,12 +54,15 @@ def solve2(data, size=70, steps=1024):
     def finished(node):
         return node == end
 
+    graph = Graph(set(data[:steps]), size)
+    path = BFS(graph, start, finished=finished)
     for i in range(steps, len(data)):
-        graph = Graph(set(data[:i+1]), size)
-        path = BFS(graph, start, finished=finished)
-        if end not in path:
-            byte = data[i]
-            return f"{byte.x},{byte.y}"
+        byte = data[i]
+        if byte in path:
+            graph = Graph(set(data[:i+1]), size)
+            path = BFS(graph, start, finished=finished)
+            if end not in path:
+                return f"{byte.x},{byte.y}"
 
 
 if __name__ == "__main__":
