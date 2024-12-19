@@ -92,29 +92,41 @@ def solve1(data):
     return ",".join(map(str, output))
 
 
-@watch.measure_time
-def solve2(data):
+def investigate_output_patterns(data):
     register_backup, program = data
     out_sequence = defaultdict(list)
-    offsets = defaultdict(lambda: None)
-    done = [False for _ in range(len(program))]
     A = 0
-    while any(offsets[i] is None for i in range(len(program))):
-        if A % 100000 == 0:
-            print(A)
-        if A == 100:
-            break
+    for A in range(5000):
         register = copy(register_backup)
         register["A"] = A
         output = run(register, program)
         for i, o in enumerate(output):
             out_sequence[i].append(o)
-            if i < len(program) and o == program[i] and offsets[i] is None:
-                offsets[i] = A
-        A += 1
-    print(offsets)
-    import rich
-    rich.print(out_sequence)
+
+    import matplotlib.pyplot as plt
+    for i, seq in out_sequence.items():
+        plt.plot(seq, label=str(i))
+    plt.legend()
+    plt.savefig("outsequences.png")
+
+
+@watch.measure_time
+def solve2(data):
+    register_backup, program = data
+    out_sequence = defaultdict(list)
+    A = 0
+    for A in range(5000):
+        register = copy(register_backup)
+        register["A"] = A
+        output = run(register, program)
+        for i, o in enumerate(output):
+            out_sequence[i].append(o)
+
+    import matplotlib.pyplot as plt
+    for i, seq in out_sequence.items():
+        plt.plot(seq, label=str(i))
+    plt.legend()
+    plt.savefig("outsequences.png")
 
 
 if __name__ == "__main__":
