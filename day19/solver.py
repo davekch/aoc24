@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from pathlib import Path
+from functools import cache
 from aoc import utils
 
 watch = utils.stopwatch()
@@ -31,25 +32,17 @@ def possible(design, patterns):
     return "" in possibilities
 
 
-def count_possible(design, patterns):
-    possibilities = [""]
-    count = -1
-    for c in design:
-        # if we fully consumed a possible pattern, start over
-        if "" in possibilities:
-            while "" in possibilities:
-                possibilities.remove("")
-                count += 1
-            possibilities += [p for p in patterns if p[0] == c]
-        
-        # print(f"{c}: {possibilities}")
-        # consume one character of all possibilities
-        _possibilities = [p[1:] for p in possibilities if p[0] == c]
-        count -= (len(possibilities) - len(_possibilities))
-        possibilities = _possibilities
-        if not possibilities:
-            return 0
-    return count + possibilities.count("")
+@cache
+def count_possibilities(design, patterns):
+    if not design:
+        return 0
+    c = 0
+    for pattern in patterns:
+        if pattern == design:
+            c += 1
+        elif design.startswith(pattern):
+            c += count_possibilities(design[len(pattern):], patterns)
+    return c
 
 
 @watch.measure_time
@@ -66,9 +59,13 @@ def solve1(data):
 @watch.measure_time
 def solve2(data):
     patterns, designs = data
+    patterns = tuple(patterns)
     s = 0
     for design in designs:
-        s += count_possible(design, patterns)
+        # print(f"check {design}")
+        count = count_possibilities(design, patterns)
+        # print(count)
+        s += count
     return s
 
 
