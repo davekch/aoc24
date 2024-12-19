@@ -10,26 +10,9 @@ watch = utils.stopwatch()
 @watch.measure_time
 def parse(raw_data):
     upper, lower = raw_data.split("\n\n")
-    patterns = [p.strip() for p in upper.split(",")]
+    patterns = tuple([p.strip() for p in upper.split(",")])
     designs = lower.splitlines()
     return patterns, designs
-
-
-def possible(design, patterns):
-    possibilities = [""]
-    for c in design:
-        # if we fully consumed a possible pattern, start over
-        if "" in possibilities:
-            while "" in possibilities:
-                possibilities.remove("")
-            possibilities += [p for p in patterns if p[0] == c]
-        
-        # print(f"{c}: {possibilities}")
-        # consume one character of all possibilities
-        possibilities = [p[1:] for p in possibilities if p[0] == c]
-        if not possibilities:
-            return False
-    return "" in possibilities
 
 
 @cache
@@ -50,21 +33,18 @@ def solve1(data):
     patterns, designs = data
     s = 0
     for design in designs:
-        if possible(design, patterns):
+        if count_possibilities(design, patterns) > 0:
             s += 1
-            # print(f"possible: {design}")
     return s
 
 
 @watch.measure_time
 def solve2(data):
     patterns, designs = data
-    patterns = tuple(patterns)
     s = 0
     for design in designs:
-        # print(f"check {design}")
+        # no calculation takes place, all results are cached
         count = count_possibilities(design, patterns)
-        # print(count)
         s += count
     return s
 
