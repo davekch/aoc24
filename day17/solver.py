@@ -42,7 +42,7 @@ def instruction(opcode, operand, register, i, output):
         register["B"] = register["B"] ^ operand
         return i + 2
     if opcode == 2:
-        register["B"] = int(str(combo(operand, register) % 8)[:3])
+        register["B"] = combo(operand, register) % 8
         return i + 2
     if opcode == 3:
         if register["A"] == 0:
@@ -110,23 +110,56 @@ def investigate_output_patterns(data):
     plt.savefig("outsequences.png")
 
 
+def solve2_numba(data):
+    import numba as nb
+    import numpy as np
+
+    # the input program is
+    # 2,4: write lowest three bits of A to B
+    # 1,1: xor that with 1 (flip lowest bit)
+    # 7,5: write floor(A / 2**B) to C
+    # 0,3: write floor(A / 2**3) to A
+    # 1,4: xor B with 4 (flip first bit?)
+    # 4,0: xor B with C and write to B
+    # 5,5: write lowest three bits of B to output
+    # 3,0: loop until A == 0
+
+    @nb.njit(parallel=True)
+    def get_A(program):
+        program_len = len(program)
+        result = nb.typed.List([0])
+        for A in nb.prange(1, np.int64(1e15)):
+            if A % 1000000 == 0:
+                print(A)
+            if result[0] != 0:
+                continue
+            B = np.int32(0)
+            C = np.int32(0)
+            output_i = np.int32(0)
+            while A != 0:
+                B = np.int32(A % 8) ^ 1
+                C = math.floor(A / 2**B)
+                A = math.floor(A / 8)
+                B = B ^ 4
+                B = B ^ C
+                # output is B % 8
+                if program[output_i] == np.int32(B % 8):
+                    if output_i == program_len - 1:
+                        result[0] = A
+                    else:
+                        output_i += 1
+                else:
+                    break
+        return result[0]
+
+    _, program = data
+    program = np.array(program, dtype=np.int32)
+    return get_A(program)
+
+
 @watch.measure_time
 def solve2(data):
-    register_backup, program = data
-    out_sequence = defaultdict(list)
-    A = 0
-    for A in range(5000):
-        register = copy(register_backup)
-        register["A"] = A
-        output = run(register, program)
-        for i, o in enumerate(output):
-            out_sequence[i].append(o)
-
-    import matplotlib.pyplot as plt
-    for i, seq in out_sequence.items():
-        plt.plot(seq, label=str(i))
-    plt.legend()
-    plt.savefig("outsequences.png")
+    return solve2_numba(data)
 
 
 if __name__ == "__main__":
