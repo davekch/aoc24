@@ -7,6 +7,13 @@ TESTDATA = """1
 2024
 """
 
+TESTDATA2 = """1
+2
+3
+2024
+"""
+
+
 @pytest.fixture
 def parsed_data():
     return parse(TESTDATA)
@@ -24,6 +31,7 @@ def test_solve1(parsed_data):
 
 
 # PART 2
-def test_solve2(parsed_data):
-    solution = solve2(parsed_data)
-    # asserts go here
+def test_solve2():
+    parsed = parse(TESTDATA2)
+    solution = solve2(parsed)
+    assert solution == 23

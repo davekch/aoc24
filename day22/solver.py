@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import math
+from collections import Counter, deque
 from aoc import utils
 
 watch = utils.stopwatch()
@@ -36,7 +37,26 @@ def solve1(data):
 
 @watch.measure_time
 def solve2(data):
-    pass
+    bananas = Counter()
+    for num in data:
+        sequence = deque()
+        price = num % 10
+        _bananas = Counter()
+        for _ in range(2000):
+            num = next_secret(num)
+            new_price = num % 10
+            diff = new_price - price
+            price = new_price
+            sequence.append(diff)
+            if len(sequence) > 4:
+                sequence.popleft()
+            _s = tuple(sequence)
+            if _s not in _bananas:
+                _bananas[_s] = price
+        bananas += _bananas
+    bananas = Counter({s: v for s, v in bananas.items() if len(s) == 4})
+    (seq, b), = bananas.most_common(1)
+    return b
 
 
 if __name__ == "__main__":
