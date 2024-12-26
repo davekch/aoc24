@@ -4,16 +4,19 @@ from pathlib import Path
 import operator as op
 import itertools
 from copy import copy
+import networkx as nx
+import bidict
+import matplotlib.pyplot as plt
 from aoc import utils
 
 watch = utils.stopwatch()
 
 
-ops = {
+ops = bidict.bidict({
     "AND": op.and_,
     "OR": op.or_,
     "XOR": op.xor,
-}
+})
 
 
 @watch.measure_time
@@ -46,6 +49,51 @@ def solve1(data):
     for i, z in enumerate(zs):
         result += evaluate(state, z) * 2**i
     return result
+
+
+def build_network(data):
+    wires = {}
+
+    for wire in data:
+        if isinstance(data[wire], int):
+            wires[wire] = {"from": wire, "to": []}
+        else:
+            op_, in1, in2 = data[wire]
+            node = f"{in1} {ops.inverse[op_]} {in2} -> {wire}"
+            # initialize
+            if wire not in wires:
+                wires[wire] = {"from": None, "to": []}
+            if in1 not in wires:
+                wires[in1] = {"from": None, "to": []}
+            if in2 not in wires:
+                wires[in2] = {"from": None, "to": []}
+            # set correct values
+            wires[wire]["from"] = node
+            wires[in1]["to"].append(node)
+            wires[in2]["to"].append(node)
+
+    seen_edges = set()
+    edge_labels = {}
+    net = nx.DiGraph()
+    for wire, connections in wires.items():
+        net.add_node(connections["from"])
+        for node in connections["to"]:
+            net.add_node(node)
+            edge = (connections["from"], node)
+            if edge not in seen_edges:
+                net.add_edge(*edge)
+                seen_edges.add(edge)
+                edge_labels[edge] = wire
+
+    return net, edge_labels
+
+
+def draw_network(graph: nx.DiGraph, labels: dict):
+    pos = nx.spring_layout(graph)
+    nx.draw(graph, pos)
+    nx.draw_networkx_edge_labels(graph, pos, edge_labels=labels)
+    plt.axis("off")
+    plt.show()
 
 
 def evaluate_with_traceback(state, node):
@@ -93,6 +141,8 @@ def solve2(data, n_swap_pairs=4):
     correct = set()
     for i, z in enumerate(zs):
         digit, nodes = evaluate_with_traceback(state, z)
+        # we only consider output nodes
+        nodes = {n for n in nodes if not n.startswith("x") and not n.startswith("y")}
         if digit == expected[i]:
             correct |= nodes
         else:
@@ -101,8 +151,9 @@ def solve2(data, n_swap_pairs=4):
     
     # print(len([n for n in (swap_candidates[0] | swap_candidates[1] )- correct if not n.startswith("x") and not n.startswith("y")]))
     
-    to_swap = swap_candidates - correct
+    to_swap = swap_candidates # - correct
     print(len(to_swap))
+    print(to_swap)
     for swapgroup in itertools.combinations(to_swap, 8):
         for pairs in all_pairings(swapgroup):
             state = copy(data)
