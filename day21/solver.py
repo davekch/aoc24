@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from bidict import frozenbidict
-from functools import cache
+from functools import cache, lru_cache
 from aoc import utils
 from aoc.geometry import Vec, Direction
 
@@ -38,6 +38,12 @@ directional_keypad = frozenbidict({
 })
 
 
+pads = {
+    "numeric": numeric_keypad,
+    "directional": directional_keypad,
+}
+
+
 directions = frozenbidict({
     "^": Direction.N,
     ">": Direction.E,
@@ -47,9 +53,9 @@ directions = frozenbidict({
 
 
 @cache
-def get_paths(start_: str, target_: str, pad: frozenbidict) -> list[str]:
-    start = pad[start_]
-    target = pad[target_]
+def get_paths(start_: str, target_: str, pad: str) -> list[str]:
+    start = pads[pad][start_]
+    target = pads[pad][target_]
     # assume that it is sufficient to only consider paths that go as straight as possible
     # two possibilities: horizontal first, then vertical, or the other way round
     def walk(dir) -> list:
@@ -59,7 +65,7 @@ def get_paths(start_: str, target_: str, pad: frozenbidict) -> list[str]:
             if dir == "x":  # urgh
                 if current.x != target.x:
                     delta = Vec((target.x - current.x) // abs(target.x - current.x), 0)
-                    if current + delta not in pad.inverse:
+                    if current + delta not in pads[pad].inverse:
                         dir = "y"
                         continue
                 else:
@@ -68,21 +74,35 @@ def get_paths(start_: str, target_: str, pad: frozenbidict) -> list[str]:
             elif dir == "y":
                 if current.y != target.y:
                     delta = Vec(0, (target.y - current.y) // abs(target.y - current.y))
-                    if current + delta not in pad.inverse:
+                    if current + delta not in pads[pad].inverse:
                         dir = "x"
                         continue
                 else:
                     dir = "x"
                     continue
             current += delta
-            path.append(pad.inverse[current])
+            path.append(pads[pad].inverse[current])
         return path
     
     return [walk("x"), walk("y")]
 
 
-@cache
+def pickycache(f):
+    cache = {}
+    def pickycached(to: str, state: tuple):
+        if len(state) <= 20:
+            if (to, state) in cache:
+                return cache[(to, state)]
+            result = f(to, state)
+            cache[(to, state)] = result
+            return result
+        return f(to, state)
+    return pickycached
+
+
+@pickycache
 def least_presses(to: str, state: tuple) -> tuple[list, tuple]:
+    # print(len(state))
     # state: ((current, keypad), (current, keypad), ...)
     #          ^ target robot     ^
     #                             ^ robot controlling target robot ...
@@ -102,7 +122,7 @@ def least_presses(to: str, state: tuple) -> tuple[list, tuple]:
         current = position
         for p in path:
             # figure out what to press on the first controller to get from current to p
-            controller_target = directions.inverse[keypad[p] - keypad[current]]
+            controller_target = directions.inverse[pads[keypad][p] - pads[keypad][current]]
             keys_, new_controllers = least_presses(controller_target, new_controllers)
             pressed_keys.extend(keys_)
             current = p
@@ -120,11 +140,16 @@ def least_presses(to: str, state: tuple) -> tuple[list, tuple]:
 def solve(data, initial_state):
     result = 0
     for code in data:
+        print(code)
         length = 0
         state = initial_state
         for key in code:
+            # print(least_presses.cache_info())
+            print(key)
             presses, state = least_presses(key, state)
             length += len(presses)
+        #     print("".join(presses), end="")
+        # print()
         assert all(k == "A" for k, _ in state)
         result += int(code[:-1]) * length
     return result
@@ -133,10 +158,10 @@ def solve(data, initial_state):
 @watch.measure_time
 def solve1(data):
     initial_state = (
-        ("A", numeric_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
+        ("A", "numeric"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
     )
     return solve(data, initial_state)
 
@@ -144,33 +169,33 @@ def solve1(data):
 @watch.measure_time
 def solve2(data):
     initial_state = (
-        ("A", numeric_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
-        ("A", directional_keypad),
+        ("A", "numeric"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
+        ("A", "directional"),
     )
     return solve(data, initial_state)
 
