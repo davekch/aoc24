@@ -3,7 +3,6 @@
 from pathlib import Path
 import math
 from copy import copy
-from collections import defaultdict
 from aoc import utils
 
 watch = utils.stopwatch()
@@ -69,97 +68,55 @@ def run(register, program):
         i = instruction(program[i], program[i+1], register, i, output)
     return output
 
-def run_while_quine(register, program):
-    i = 0
-    quine_i = 0
-    output = []
-    while i < len(program):
-        _i = instruction(program[i], program[i+1], register, i, output)
-        if program[i] == 5:
-            # something was added to the output
-            if output[quine_i] != program[quine_i]:
-                return output
-            else:
-                quine_i += 1
-        i = _i
-    return output
-
 
 @watch.measure_time
 def solve1(data):
     register, program = data
+    register = copy(register)
     output = run(register, program)
     return ",".join(map(str, output))
 
 
-def investigate_output_patterns(data):
-    register_backup, program = data
-    out_sequence = defaultdict(list)
-    A = 0
-    for A in range(5000):
-        register = copy(register_backup)
-        register["A"] = A
-        output = run(register, program)
-        for i, o in enumerate(output):
-            out_sequence[i].append(o)
-
-    import matplotlib.pyplot as plt
-    for i, seq in out_sequence.items():
-        plt.plot(seq, label=str(i))
-    plt.legend()
-    plt.savefig("outsequences.png")
-
-
-def solve2_numba(data):
-    import numba as nb
-    import numpy as np
-
-    # the input program is
-    # 2,4: write lowest three bits of A to B
-    # 1,1: xor that with 1 (flip lowest bit)
-    # 7,5: write floor(A / 2**B) to C
-    # 0,3: write floor(A / 2**3) to A
-    # 1,4: xor B with 4 (flip first bit?)
-    # 4,0: xor B with C and write to B
-    # 5,5: write lowest three bits of B to output
-    # 3,0: loop until A == 0
-
-    @nb.njit(parallel=True)
-    def get_A(program):
-        program_len = len(program)
-        result = nb.typed.List([0])
-        for A in nb.prange(1, np.int64(1e15)):
-            if A % 1000000 == 0:
-                print(A)
-            if result[0] != 0:
-                continue
-            B = np.int32(0)
-            C = np.int32(0)
-            output_i = np.int32(0)
-            while A != 0:
-                B = np.int32(A % 8) ^ 1
-                C = math.floor(A / 2**B)
-                A = math.floor(A / 8)
-                B = B ^ 4
-                B = B ^ C
-                # output is B % 8
-                if program[output_i] == np.int32(B % 8):
-                    if output_i == program_len - 1:
-                        result[0] = A
-                    else:
-                        output_i += 1
-                else:
-                    break
-        return result[0]
-
-    _, program = data
-    program = np.array(program, dtype=np.int32)
-    return get_A(program)
+# my program translates to
+# B = 0
+# C = 0
+# while A != 0:
+#     B = (A % 8) ^ 1            # B becomes least significant digit of A (in base 8) XOR 1
+#     C = math.floor(A / 2**B)   # C is dependent on the whole value of A
+#     A = math.floor(A / 8)      # A strips off its least significant digit (in base 8)
+#     B = B ^ 4
+#     B = B ^ C
+#     output.append(B % 8)
+#
+# (thinking in base 8) at each step, A gets reduced by one digit
+# this means we can work our way up digit by digit
+# the first output depends on the entire value of A
+# last output only depends on first (most significant) digit of A
+# -> find most significant digit first, then iterate
 
 
 @watch.measure_time
 def solve2(data):
-    return solve2_numba(data)
+    register_orig, program = data
+    # print(program)
+    digits_candidates = [""]  # not every digit must be unambiguous -- keep track of possibilities
+    for i, expected_output in enumerate(reversed(program)):
+        # print(f"trying to find the {i}. digit with {expected_output=}")
+        new_digit_candidates = []
+        for digits in digits_candidates:
+            # print(f" trying with A={digits}")
+            for digit in range(8):
+                # print(f"  trying {digit}")
+                register = register_orig | {"A": int(f"{digits}{digit}", base=8)}
+                output = run(register, program)
+                # print(f"   {output}")
+                if output[0] == expected_output:
+                    # only carry on with this `digits` if the output works with any new digit
+                    new_digit_candidates.append(digits + str(digit))
+                    # print(f" correct {i}. digit is {digit}")
+        digits_candidates = new_digit_candidates
+    # print(digits_candidates)  # -> interesting: the solution is not unique
+    return int(digits_candidates[0], base=8)
 
 
 if __name__ == "__main__":
