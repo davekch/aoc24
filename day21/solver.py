@@ -2,9 +2,22 @@
 
 from pathlib import Path
 from bidict import frozenbidict
-from functools import cache, lru_cache
+from functools import cache
+from collections import defaultdict
+import rich
+from tqdm import tqdm
 from aoc import utils
 from aoc.geometry import Vec, Direction
+
+try:
+    from itertools import batched
+except ImportError:
+    # for pypy
+    def batched(l, n):
+        i = 0
+        while i < len(l):
+            yield l[i:i+n]
+            i += n
 
 watch = utils.stopwatch()
 
@@ -87,20 +100,7 @@ def get_paths(start_: str, target_: str, pad: str) -> list[str]:
     return [walk("x"), walk("y")]
 
 
-def pickycache(f):
-    cache = {}
-    def pickycached(to: str, state: tuple):
-        if len(state) <= 20:
-            if (to, state) in cache:
-                return cache[(to, state)]
-            result = f(to, state)
-            cache[(to, state)] = result
-            return result
-        return f(to, state)
-    return pickycached
-
-
-@pickycache
+@cache
 def least_presses(to: str, state: tuple) -> tuple[list, tuple]:
     # print(len(state))
     # state: ((current, keypad), (current, keypad), ...)
@@ -137,21 +137,39 @@ def least_presses(to: str, state: tuple) -> tuple[list, tuple]:
     return best, new_state
 
 
-def solve(data, initial_state):
-    result = 0
+# @cache
+# def solve_partial_code(code, state):
+#     total_presses = ""
+#     for key in code:
+#         presses, state = least_presses(key, state)
+#         total_presses += "".join(presses)
+#     return total_presses
+
+
+def solve(data, initial_state, progress_bar=False):
+    results = defaultdict(str)
     for code in data:
-        print(code)
-        length = 0
+        # print(code)
         state = initial_state
-        for key in code:
+        if progress_bar:
+            iter_code = tqdm(code)
+        else:
+            iter_code = code
+        for key in iter_code:
             # print(least_presses.cache_info())
-            print(key)
+            # print(key)
             presses, state = least_presses(key, state)
-            length += len(presses)
+            results[code] += "".join(presses)
         #     print("".join(presses), end="")
         # print()
         assert all(k == "A" for k, _ in state)
-        result += int(code[:-1]) * length
+    return results
+
+
+def calculate_complexities(results):
+    result = 0
+    for code, presses in results.items():
+        result += int(code[:-1]) * len(presses)
     return result
 
 
@@ -163,7 +181,8 @@ def solve1(data):
         ("A", "directional"),
         ("A", "directional"),
     )
-    return solve(data, initial_state)
+    results = solve(data, initial_state)
+    return calculate_complexities(results)
 
 
 @watch.measure_time
@@ -197,7 +216,14 @@ def solve2(data):
         ("A", "directional"),
         ("A", "directional"),
     )
-    return solve(data, initial_state)
+    results = {code: code for code in data}
+    for i, state_chunk in enumerate(batched(initial_state, 5)):
+        print(f"batch {i}")
+        partial_results = solve(results.values(), state_chunk, progress_bar=True)
+        for code, presses in zip(results.keys(), partial_results.values()):
+            results[code] = presses
+    return calculate_complexities(results)
+    
 
 
 if __name__ == "__main__":
