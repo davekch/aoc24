@@ -3,8 +3,10 @@
 from pathlib import Path
 from bidict import frozenbidict
 from functools import cache
-from collections import defaultdict
+from collections import defaultdict, Counter
 import rich
+import re
+import rich.pretty
 from tqdm import tqdm
 from aoc import utils
 from aoc.geometry import Vec, Direction
@@ -73,7 +75,7 @@ def get_paths(start_: str, target_: str, pad: str) -> list[str]:
     # two possibilities: horizontal first, then vertical, or the other way round
     def walk(dir) -> list:
         current = start
-        path = []
+        path = ""
         while current != target:
             if dir == "x":  # urgh
                 if current.x != target.x:
@@ -94,7 +96,7 @@ def get_paths(start_: str, target_: str, pad: str) -> list[str]:
                     dir = "x"
                     continue
             current += delta
-            path.append(pads[pad].inverse[current])
+            path += pads[pad].inverse[current]
         return path
     
     return [walk("x"), walk("y")]
@@ -102,6 +104,10 @@ def get_paths(start_: str, target_: str, pad: str) -> list[str]:
 
 @cache
 def least_presses(to: str, state: tuple) -> tuple[list, tuple]:
+    """
+    calculates the sequence of least keypresses on the last controller to get
+    the first robot to `to`. returns the sequence and the updated state
+    """
     # print(len(state))
     # state: ((current, keypad), (current, keypad), ...)
     #          ^ target robot     ^
@@ -137,13 +143,39 @@ def least_presses(to: str, state: tuple) -> tuple[list, tuple]:
     return best, new_state
 
 
-# @cache
-# def solve_partial_code(code, state):
-#     total_presses = ""
-#     for key in code:
-#         presses, state = least_presses(key, state)
-#         total_presses += "".join(presses)
-#     return total_presses
+def counter_len(c: Counter) -> int:
+    return sum(len(code) * n for code, n in c.items())
+
+
+@cache
+def least_presses__(code: str, state: tuple) -> tuple[Counter[str], tuple]:
+    robot, *controllers = state
+    position, keypad = robot
+    if not controllers:
+        return Counter({code: 1}), ((code[-1], keypad),)
+
+    result = Counter()
+    for key in code:
+        paths = get_paths(position, key, keypad)
+        # tranlsate the paths into what needs to be pressed on the controller
+        controller_codes = []
+        for path in paths:
+            current = position
+            controller_code = ""
+            for p in path:
+                controller_code += directions.inverse[pads[keypad][p] - pads[keypad][current]]
+                current = p
+            controller_codes.append(controller_code + "A")
+        # now we know what needs to be pressed on the first controller in order to move the
+        # finger along each of the paths to get to key -> figure out which of
+        # the paths requires the least key presses
+        key_presses = [least_presses__(subcode, tuple(controllers)) for subcode in controller_codes]
+        best, new_controllers = min(key_presses, key=lambda i: counter_len(i[0]))
+        result += best
+        position = key
+
+    return result, new_controllers
+
 
 
 def solve(data, initial_state, progress_bar=False):
@@ -182,48 +214,111 @@ def solve1(data):
         ("A", "directional"),
     )
     results = solve(data, initial_state)
+    # rich.print({code: Counter(re.findall(r"[<>^v]*A", presses)) for code, presses in results.items()})
     return calculate_complexities(results)
+
+
+@cache
+def solve_partial_code(code, states):
+    """
+    get the sequence of keypresses on the last controller needed make the first robot
+    punch in the code
+    """
+    total_presses = ""
+    for key in code:
+        presses, states = least_presses(key, states)
+        total_presses += "".join(presses)
+    return total_presses
 
 
 @watch.measure_time
-def solve2(data):
-    initial_state = (
-        ("A", "numeric"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-        ("A", "directional"),
-    )
-    results = {code: code for code in data}
-    for i, state_chunk in enumerate(batched(initial_state, 5)):
-        print(f"batch {i}")
-        partial_results = solve(results.values(), state_chunk, progress_bar=True)
-        for code, presses in zip(results.keys(), partial_results.values()):
-            results[code] = presses
-    return calculate_complexities(results)
-    
+def solve2(data, robots=None):
+    if not robots:
+        robots = (
+            ("A", "numeric"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+            ("A", "directional"),
+        )
+
+    result = 0
+    for code in data:
+        counter, _ = least_presses__(code, robots)
+        result += int(code[:-1]) * counter_len(counter)
+    return result
+    # results = solve(data, robots)
+    # return calculate_complexities(results)
+
+    test_result = solve(data, robots)
+    print("test:")
+    rich.print(test_result)
+    # rich.print({code: Counter(re.findall(r"[<>^v]*A", presses)) for code, presses in test_result.items()})
+
+    results = {code: Counter({code: 1}) for code in data}
+    for code in results:
+        counter = results[code]
+        print(code)
+        for i in range(len(robots) - 1):
+            robot = robots[i]
+            controller = robots[i+1]
+            # print(f"{code=}")
+            new_counter = Counter()
+            for partial_code in counter.keys():
+                # print(f" {partial_code=}")
+                presses = solve_partial_code(partial_code, (robot, controller))
+                # print(presses)
+                # devide the sequence into chunks that end with A -> this way we don't
+                # really need to care about state + we increase cache hit rate (?)
+                for new_partial_code in re.findall(r"[<>^v]*A", presses):
+                    new_counter[new_partial_code] += counter[partial_code]
+            # print(new_counter)
+            results[code] = new_counter
+            counter = new_counter
+            print(f"  {new_counter=}")
+        print()
+
+    # rich.print(results)
+
+    print()
+    for (code, expected), actual in zip(test_result.items(), results.values()):
+        expected = Counter(re.findall(r"[<>^v]*A", expected))
+        if expected != actual:
+            print(f"{code} differs!")
+            rich.print(expected)
+            rich.print(actual)
+            print()
+
+    result = 0
+    for code, counter in results.items():
+        result += int(code[:-1]) * sum(len(partial) * n for partial, n in counter.items())
+    return result
+
+
+# 10547227264 too low
+# 485508384600 not right
 
 
 if __name__ == "__main__":
